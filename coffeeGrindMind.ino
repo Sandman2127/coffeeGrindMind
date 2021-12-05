@@ -17,10 +17,10 @@
 
 unsigned long timeDelay = 0;  // max is 4,294,967,295
 unsigned long mSecDelay = 0;
-int secDelay = 0;   // max size is -32,768 to 32,767 
+unsigned long secDelay = 0;   // max size is -32,768 to 32,767 
 int grindStatus = 0;
 int anaVal = 0;
-int timeDelaySec = 0;
+unsigned long timeDelaySec = 0;
 int timeOrWeight = 0;
 int grindType = 0;  // 0 timed grind , 1 weigh based grind
 int weightMapped = 0; // set weight desired by the user in the function
@@ -39,7 +39,7 @@ int timeOrWeightPin = 6;
 TFT TFTscreen = TFT(cs, dc, rst);
 
 // char array to print to the screen
-char GrindTime[2];  // up to 75 sec
+char GrindTime[3];  // up to 75 sec
 char GrindWeight[3]; // up to 100g
 char seconds[5];
 char grams[5] ;
@@ -62,6 +62,7 @@ int b_text = 0;
 
 
 void setup() {
+  Serial.begin(9600);
   TFTscreen.begin();
   // clear the screen with a black background
   TFTscreen.background(r_background,g_background,b_background);
@@ -141,12 +142,12 @@ unsigned long checkTimer() {
   return mSecDelay;
 }
 
-void writeTimeValue(char GrindTime[2]) {
+void writeTimeValue(char GrindTime[3]) {
   TFTscreen.stroke(r_text, g_text, b_text);
   TFTscreen.text(GrindTime, xPosTime, yPosTime);
 }
 
-void eraseTimeValue(char GrindTime[2]) {
+void eraseTimeValue(char GrindTime[3]) {
   TFTscreen.stroke(r_background,g_background,b_background);
   TFTscreen.text(GrindTime, xPosTime, yPosTime);
 }
@@ -169,12 +170,16 @@ void loop() {
   grindType = checkTimedOrWeightGrind();
   if (grindType == 0){
     timeDelay = checkTimer();
-//    Serial.print("Current timer delay is:");
-//    Serial.println(timeDelay);
+    Serial.print("[STDERR]: Current timer delay in mSec is:");
+    Serial.println(timeDelay);
     // convert time delay from up to 99 sec to character array to print to screen.
     timeDelaySec = timeDelay/1000 ;
+    Serial.print("[STDERR]: Current timer delay in Sec is:");
+    Serial.println(timeDelaySec);
     String tString = String(timeDelaySec);
-    tString.toCharArray(GrindTime,2);
+    tString.toCharArray(GrindTime,3);
+    Serial.print("[STDERR]: Current GrindTime  is:");
+    Serial.println(GrindTime);
     writeTimeValue(GrindTime);
     // check if you want immediate grinder activation
     grindStatus = checkGrindActivationStatus();
