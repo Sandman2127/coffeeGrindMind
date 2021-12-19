@@ -21,11 +21,13 @@ unsigned long secDelay = 0;   // max size is -32,768 to 32,767
 int grindStatus = 0;
 int anaVal = 0;
 unsigned long timeDelaySec = 0;
+unsigned long prevTimeDelaySec = 0;
 int timeOrWeight = 0;
 int grindType = 0;  // 0 timed grind , 1 weigh based grind
 int weightMapped = 0; // set weight desired by the user in the function
 int setWeight = 0; // set weight desired by the user
 int currentWeight = 0; //set by a sensor input read by the arduino, likely going to involve an analogRead()
+int doNothing;
 
 
 //pins
@@ -62,7 +64,7 @@ int b_text = 0;
 
 
 void setup() {
-  Serial.begin(9600);
+  //  Serial.begin(9600);
   TFTscreen.begin();
   // clear the screen with a black background
   TFTscreen.background(r_background,g_background,b_background);
@@ -79,9 +81,9 @@ void setup() {
   TFTscreen.setTextSize(3);
   // set the color of the bubbles
   // TFTscreen.fill(255,255,255);
-  char seconds[5] = "sec";
+  char seconds[5] = "s";
   TFTscreen.text(seconds,screenWidth/2,screenHeight/3);
-  char grams[5] = "grams";
+  char grams[5] = "g";
   TFTscreen.text(grams,screenWidth/2,2*(screenHeight/3));
 }
 
@@ -170,31 +172,35 @@ void loop() {
   grindType = checkTimedOrWeightGrind();
   if (grindType == 0){
     timeDelay = checkTimer();
-    Serial.print("[STDERR]: Current timer delay in mSec is:");
-    Serial.println(timeDelay);
+    //    Serial.print("[STDERR]: Current timer delay in mSec is:");
+    //    Serial.println(timeDelay);
     // convert time delay from up to 99 sec to character array to print to screen.
     timeDelaySec = timeDelay/1000 ;
-    Serial.print("[STDERR]: Current timer delay in Sec is:");
-    Serial.println(timeDelaySec);
-    String tString = String(timeDelaySec);
-    tString.toCharArray(GrindTime,3);
-    Serial.print("[STDERR]: Current GrindTime  is:");
-    Serial.println(GrindTime);
-    writeTimeValue(GrindTime);
-    // check if you want immediate grinder activation
+    //    Serial.print("[STDERR]: Current timer delay in Sec is:");
+    //    Serial.println(timeDelaySec);
+    //    String tString = String(timeDelaySec);
+    //    tString.toCharArray(GrindTime,3);
+    //    Serial.print("[STDERR]: Current GrindTime  is:");
+    //    Serial.println(GrindTime);
+    // a quick check to ensure we aren't rewriting the screen when unecessary
+    if (prevTimeDelaySec == timeDelaySec){ doNothing = 0; } else { writeTimeValue(GrindTime); }
+    // final check to decide if you want immediate grinder activation
     grindStatus = checkGrindActivationStatus();
     if (grindStatus == 1){
       runTimedGrind(timeDelay);
     }
-    // basically display the value then erase it and go look for a change...
+    // time delay between check and erase...
     delay(750);
-    eraseTimeValue(GrindTime);
+    // a check to ensure we aren't rewriting the screen when unecessary
+    if (prevTimeDelaySec == timeDelaySec){ doNothing = 0; } else { eraseTimeValue(GrindTime); }
+  prevTimeDelaySec = timeDelaySec;
+    
   } else {
-    //weight based grind
+    // weight based grind
     setWeight = getSetWeight();
-//    Serial.print("Current weight is selected is: ");
-//    Serial.print(setWeight);
-//    Serial.println(" grams");
+    //    Serial.print("Current weight is selected is: ");
+    //    Serial.print(setWeight);
+    //    Serial.println(" grams");
     // convert set weight from up to 999g to character array to print out on screen
     String wString = String(setWeight);
     wString.toCharArray(GrindWeight,3);
