@@ -17,11 +17,18 @@
 
 unsigned long timeDelay = 0;  // max is 4,294,967,295
 unsigned long mSecDelay = 0;
-unsigned long secDelay = 0;   // max size is -32,768 to 32,767 
-int grindStatus = 0;
+int secDelay = 0;
+int correctedSecDelay = 0;
+int grindStatus = 0; 
 int anaVal = 0;
-unsigned long timeDelaySec = 0;
+unsigned long timeDelaySec = 1;
 unsigned long prevTimeDelaySec = 0;
+// positive_bias is an <int> value > 0 that is read as the lowest possible time time because of the lowest achievable resistance 1k
+// empirically determined to be: 7 seconds
+int positive_bias = 7;
+// we'll use it to correct the baseline
+int max_set_time = positive_bias + 45;  // 45 sec minimum
+int grindTimePrevWritten = 0;
 int timeOrWeight = 0;
 int grindType = 0;  // 0 timed grind , 1 weigh based grind
 int weightMapped = 0; // set weight desired by the user in the function
@@ -42,14 +49,19 @@ TFT TFTscreen = TFT(cs, dc, rst);
 
 // char array to print to the screen
 char GrindTime[3];  // up to 75 sec
+char prevGrindTime[3];
+
+//    String tString = String(timeDelaySec);
+//    tString.toCharArray(GrindTime,3);
+
 char GrindWeight[3]; // up to 100g
 char seconds[5];
 char grams[5] ;
 int screenWidth = TFTscreen.width();
 int screenHeight = TFTscreen.height();
-int xPosTime = 35 ;
+int xPosTime = 25 ;
 int yPosTime = screenHeight/3;
-int xPosWeight = 35 ;
+int xPosWeight = 25 ;
 int yPosWeight =  2*(screenHeight/3);
 int x = 0;
 int y = 0;
@@ -78,13 +90,13 @@ void setup() {
   TFTscreen.text("GrindMindv0.1",5,0);
   
   // set the font size very large for the loop
-  TFTscreen.setTextSize(3);
+  TFTscreen.setTextSize(6);
   // set the color of the bubbles
   // TFTscreen.fill(255,255,255);
   char seconds[5] = "s";
-  TFTscreen.text(seconds,screenWidth/2,screenHeight/3);
-  char grams[5] = "g";
-  TFTscreen.text(grams,screenWidth/2,2*(screenHeight/3));
+  TFTscreen.text(seconds,2*(screenWidth/3),screenHeight/3);
+  //  char grams[5] = "g";
+  //  TFTscreen.text(grams,2*(screenWidth/3),screenHeight/3);
 }
 
 
@@ -139,8 +151,11 @@ int getSetWeight() {
 unsigned long checkTimer() {
   anaVal = analogRead(analogP1);
   //  map(value, fromLow, fromHigh, toLow, toHigh)
-  secDelay =  map(anaVal, 0, 1023, 0, 75);
-  mSecDelay = secDelay * 1000;
+  secDelay =  map(anaVal, 0, 1023, 0, 45);
+  correctedSecDelay = map(secDelay, positive_bias, max_set_time, 0, 45);
+  if (secDelay < 0){
+  }
+  mSecDelay = correctedSecDelay * 1000;
   return mSecDelay;
 }
 
@@ -166,7 +181,7 @@ void eraseWeightValue(char GrindWeight[3]) {
 
 
 void loop() {
-  // *** MAIN GRINDER RUN LOOP ***
+  // *** MAIN GRINDER RUN LOOP *** //
   
   // check grind type, timed: 0, weight based: 1
   grindType = checkTimedOrWeightGrind();
@@ -178,12 +193,24 @@ void loop() {
     timeDelaySec = timeDelay/1000 ;
     //    Serial.print("[STDERR]: Current timer delay in Sec is:");
     //    Serial.println(timeDelaySec);
-    //    String tString = String(timeDelaySec);
-    //    tString.toCharArray(GrindTime,3);
+    String tString = String(timeDelaySec);
+    tString.toCharArray(GrindTime,3);
     //    Serial.print("[STDERR]: Current GrindTime  is:");
     //    Serial.println(GrindTime);
     // a quick check to ensure we aren't rewriting the screen when unecessary
-    if (prevTimeDelaySec == timeDelaySec){ doNothing = 0; } else { writeTimeValue(GrindTime); }
+    if (prevTimeDelaySec == timeDelaySec && grindTimePrevWritten == 1){ 
+      doNothing = 0; 
+    } else if (prevTimeDelaySec != timeDelaySec && grindTimePrevWritten == 1){
+      String dString = String(prevTimeDelaySec);
+      dString.toCharArray(prevGrindTime,3);
+      eraseTimeValue(prevGrindTime);
+      writeTimeValue(GrindTime);
+      grindTimePrevWritten = 1;
+    } else {
+      // this only happens in setup, covers situations where prevTimeDelaySec == timeDelaySec && grindTimePrevWritten != 1, there's nothing to erase
+      writeTimeValue(GrindTime);
+      grindTimePrevWritten = 1; 
+    }
     // final check to decide if you want immediate grinder activation
     grindStatus = checkGrindActivationStatus();
     if (grindStatus == 1){
@@ -191,8 +218,15 @@ void loop() {
     }
     // time delay between check and erase...
     delay(750);
-    // a check to ensure we aren't rewriting the screen when unecessary
-    if (prevTimeDelaySec == timeDelaySec){ doNothing = 0; } else { eraseTimeValue(GrindTime); }
+    
+    //    // a check to ensure we aren't rewriting the screen when unecessary
+    //    if (prevTimeDelaySec == timeDelaySec && grindTimePrevWritten == 1){ 
+    //      doNothing = 0; 
+    //    } else { 
+    //      eraseTimeValue(GrindTime);
+    //      grindTimePrevWritten = 0;
+    //    }
+  strcpy(GrindTime,prevGrindTime);
   prevTimeDelaySec = timeDelaySec;
     
   } else {
